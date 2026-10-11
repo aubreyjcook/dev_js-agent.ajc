@@ -1,0 +1,26 @@
+{
+  "name": "js-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js agent: a hardware-input agent core plus a separately maintainable subroutine layer, driven from the terminal.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "live": "tsx src/index.ts --live",
+    "exec": "tsx src/index.ts --exec",
+    "check": "tsc --noEmit",
+    "test": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2"
+  }
+}
