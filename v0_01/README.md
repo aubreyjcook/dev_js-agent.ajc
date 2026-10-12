@@ -9,6 +9,11 @@ together, and separated cleanly enough to be worked on independently. The
 built-in command set is only what was asked for — stop everything, see what is
 running, exit.
 
+> New to TypeScript, or to this codebase? Read
+> [`docs/LEARNING-GUIDE.md`](docs/LEARNING-GUIDE.md). It walks the same
+> architecture this README summarises, but explains the language features and
+> the reasoning behind each decision as it goes.
+
 ---
 
 ## The two halves
