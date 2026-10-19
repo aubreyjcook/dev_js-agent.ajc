@@ -1,0 +1,31 @@
+{
+  "name": "js-agent",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Node.js agent: a hardware-input core plus subroutines, runnable standalone or as a daemon that any terminal can drive.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "standalone": "tsx src/index.ts --mode standalone",
+    "live": "tsx src/index.ts --mode standalone --live",
+    "daemon": "tsx src/index.ts --mode daemon",
+    "daemon:detach": "tsx src/index.ts --mode daemon --detach",
+    "attach": "tsx src/index.ts --mode attach",
+    "stop-daemon": "tsx src/index.ts --stop-daemon",
+    "exec": "tsx src/index.ts --exec",
+    "check": "tsc --noEmit",
+    "test": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2"
+  }
+}

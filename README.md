@@ -3,24 +3,32 @@
 A Node.js agent that drives this machine's keyboard and mouse, with a separate
 layer of scripted *subroutines* on top, driven from the terminal.
 
-## Current target: [`v0_01/`](v0_01/README.md)
+## Versions
 
-Everything lives in `v0_01/`. It is a self-contained package with its own
-`package.json` and dependencies, so it can be built, run and versioned on its
-own.
+| Target | What it adds | Docs |
+|---|---|---|
+| [`v0_02/`](v0_02/README.md) | **current** — daemon mode: one process owns the device, any terminal can send it commands; mode chooser at startup | [README](v0_02/README.md) · [what changed](v0_02/docs/V0_02-CHANGES.md) · [TypeScript tour](v0_02/docs/LEARNING-GUIDE.md) |
+| [`v0_01/`](v0_01/README.md) | single process, local terminal only | [README](v0_01/README.md) · [TypeScript tour](v0_01/docs/LEARNING-GUIDE.md) |
+
+Each target is a self-contained package with its own dependencies, so they can be
+built, run and versioned independently.
+
+## Quick start
 
 ```bash
-cd v0_01
+cd v0_02
 npm install
-npm start          # interactive, dry run — nothing is sent to the real desktop
-npm run live       # interactive, real keyboard and mouse
-npm test           # behaviour checks
+npm start          # asks: standalone, or daemon
+npm test           # 45 behaviour checks
 ```
 
-See [`v0_01/README.md`](v0_01/README.md) for the architecture, the command set,
-the subroutine catalogue, and how to add to either half.
+`npm start` defaults to a dry-run input driver, so nothing reaches your real
+desktop until you pass `--live`.
 
-New to TypeScript, or want the reasoning behind the design? Read
-[`v0_01/docs/LEARNING-GUIDE.md`](v0_01/docs/LEARNING-GUIDE.md) — a guided tour of
-the program and the language features it uses, written for someone learning
-TypeScript.
+Daemon mode, in short:
+
+```bash
+npm run daemon:detach                      # background service
+npm start -- --mode attach --exec status   # from any terminal
+npm start -- --stop-daemon                 # stop the service
+```
