@@ -9,35 +9,27 @@ layer of *subroutines* on top. It runs in one of three modes:
 | **daemon** | One process owns the device and serves commands from **any terminal** on the machine. |
 | **attach** | This process is only a client: commands go to the running daemon. |
 
-When you run it without `--mode`, it asks. Explicit flags skip the question.
-
-> New to the code? Read [`docs/V0_02-CHANGES.md`](docs/V0_02-CHANGES.md) for what
-> changed since v0_01 and why, or [`docs/LEARNING-GUIDE.md`](docs/LEARNING-GUIDE.md)
-> for a full TypeScript tour of the agent and subroutine layers (written against
-> v0_01; still accurate for those layers).
+Exactly one process owns the hardware; every other process is a client with no
+input access. When you run it without `--mode`, it asks — explicit flags skip the
+question.
 
 ---
 
-## The design in one picture
+## Documentation
 
-```
-        clients (any number of terminals)
-        ┌──────────────────┐   ┌──────────────────┐
-        │ attach           │   │ standalone       │
-        │ RemoteSession    │   │ LocalSession     │
-        └────────┬─────────┘   └────────┬─────────┘
-                 │ local socket          │ in-process
-        ┌────────▼───────────────────────▼─────────┐
-        │            CommandBroker                 │  ← decides what a command means
-        ├──────────────────────────────────────────┤
-        │  Agent (keyboard/mouse)  Subroutines     │  ← unchanged since v0_01
-        │  TaskRegistry            EventBus        │
-        └──────────────────────────────────────────┘
-```
+| Document | Read it for |
+|---|---|
+| **this file** | what it is and how to start it |
+| [Overview](docs/OVERVIEW.md) | the architecture, the three modes, how a command travels |
+| [User guide](docs/USER-GUIDE.md) | every mode, options, commands, examples, troubleshooting, security |
+| [What changed in v0_02](docs/V0_02-CHANGES.md) | the design decisions and the bugs that shaped them |
+| [Learning guide](docs/LEARNING-GUIDE.md) | a TypeScript tour of the agent and subroutine layers |
+| [Roadmap](docs/ROADMAP.md) | what comes next (v0_03), with acceptance criteria |
+| [v0_01](../v0_01/README.md) | the single-process baseline this version grew from |
 
-The agent and the subroutines never import each other. Both talk only through
-`src/contract/`. The daemon added in v0_02 did not change either of them — that
-is the point of the split.
+Every version follows the same documentation shape: landing page, architecture
+overview, user guide, learning guide, change document, and a roadmap for the next
+version.
 
 ---
 
@@ -54,72 +46,31 @@ npm run standalone   # local prompt, dry run — nothing reaches the desktop
 npm run live         # local prompt, real keyboard and mouse
 ```
 
-### Daemon mode
+### Daemon in four lines
 
 ```bash
-# Terminal 1: start a background daemon (dry run by default)
-npm run daemon:detach
-#   pid 12345 · endpoint pipe \\.\pipe\js-agent-1a2b3c · log ~/.js-agent/daemon.log
-
-# Terminal 2, 3, …: drive it
-npm run attach                                  # interactive prompt
-npm start -- --mode attach --exec "list"        # one command
-npm start -- --mode attach --exec "stop"        # stop shared work
-npm start -- --stop-daemon                      # stop the service
+npm run daemon:detach                      # background service, dry run
+npm start -- --mode attach --exec status   # from any terminal
+npm start -- --mode attach --exec "stop"   # cancel shared work
+npm start -- --stop-daemon                 # stop the service
 ```
 
-Or keep it in the foreground to watch the logs:
+Or run it in the foreground (`npm run daemon`) to watch the logs; Ctrl+C stops it.
 
-```bash
-npm run daemon          # Ctrl+C stops it
-```
+### The three-terminal pattern
 
-### Verify the interesting part
-
-Three terminals, one run:
+This is the workflow daemon mode exists for:
 
 ```bash
 # 1: start something long and return immediately
 npm start -- --mode attach --exec "demo hello 8000" --no-wait
 
-# 2: see it
+# 2: watch it
 npm start -- --mode attach --exec "list" --no-wait
 
-# 3: stop it (visible to everyone)
+# 3: stop it (everyone sees the cancellation)
 npm start -- --mode attach --exec "stop"
 ```
-
----
-
-## Options
-
-```
---mode <mode>           standalone | daemon | attach
---standalone            shorthand for --mode standalone
---daemon                shorthand for --mode daemon
---attach                shorthand for --mode attach
---detach                daemon mode: run in the background and return
---stop-daemon           stop a running daemon, then exit
---state-dir <path>      where the discovery file, socket and log live
---port <n>              use loopback TCP instead of a local socket (0 = choose one)
---endpoint <path>       explicit pipe/socket path
---log-file <path>       also write logs to this file
---ask                   ask for a mode even when stdin is not a terminal
---no-wait               with --exec: return without waiting for background work
-
---live / --dry-run      real input, or the recording driver (default: dry run)
---log-level <level>     debug | info | warn | error
---speed / --key-delay / --char-delay
---exec <command>        run a command, then exit; repeatable
---help
-```
-
-Conflicts are rejected before anything starts, with exit code 2: two different
-modes, `--detach` without daemon mode, `--port` with `--endpoint`,
-`--stop-daemon` with `--exec`.
-
-Exit codes: `0` success, `1` a command or run failed (or no daemon to talk to),
-`2` bad usage or no safe mode choice.
 
 ---
 
@@ -131,72 +82,54 @@ Exit codes: `0` success, `1` a command or run failed (or no daemon to talk to),
 | `list [--all]` | what is running now; `--all` adds finished runs |
 | `stop` | cancel **every** running subroutine, in every client |
 | `status` | agent, driver, host, and daemon details if attached |
-| `exit` | leave this terminal. **In attach mode: detach; the daemon keeps running** |
+| `exit` | leave this terminal. **Attach mode: detach; the daemon keeps running** |
 | `shutdown` | stop the program — or the daemon and all its clients |
 
 Subroutines are unchanged from v0_01: `press-key`, `type-text`, `move-mouse`,
 `click-mouse`, `scroll`, `goto`, `demo`.
 
----
-
-## How the daemon works
-
-- **Discovery.** On start the daemon writes `daemon.json` into its state
-  directory (`~/.js-agent` by default): pid, endpoint, protocol version. Clients
-  find it there, so a daemon on an OS-chosen port is still findable.
-- **Transport.** A named pipe (Windows) or unix socket (POSIX). `--port` opts
-  into loopback TCP for debugging or restricted environments.
-- **Protocol.** Newline-delimited JSON with a versioned handshake; every request
-  has an id; every frame is validated before it is trusted.
-- **Single instance.** An exclusive lock file, claimed *before* the input device
-  is opened. A second daemon refuses with a clear message and leaves the first
-  one alone.
-- **Lifecycle.** `--detach` spawns a background process and waits until it is
-  reachable. `--stop-daemon` asks it to shut down over the protocol so it can
-  cancel work, release the device and clean up.
-
-Full reasoning, including the bugs that shaped it, is in
-[`docs/V0_02-CHANGES.md`](docs/V0_02-CHANGES.md).
+Exit codes: `0` success, `1` a command or run failed (or no daemon to talk to),
+`2` bad usage or no safe mode choice. The full option list is in the
+[user guide](docs/USER-GUIDE.md).
 
 ---
 
-## Layout
+## How it is built
 
 ```
-src/
-  contract/      shared types only. The seam. (v0_02 added commands, events,
-                 protocol, transport.)
-  core/          the agent: drivers, keymap, task registry. Unchanged.
-  subroutines/   behaviours, one file each. Unchanged.
-  terminal/      front ends and command layer:
-                   broker.ts          decides what a command means (new)
-                   local-session.ts   standalone prompt
-                   remote-session.ts  attached prompt (new)
-                   commands.ts        help/list/stop/status/exit/shutdown
-                   render.ts          formatting shared by both front ends (new)
-  daemon/        transport, framing, protocol server/client, discovery, lock,
-                 lifecycle. All new in v0_02.
-  cli/           flag parsing and the mode chooser.
-  app.ts         composition root: builds the runtime and the bus.
-  index.ts       entry point: parse → stop-daemon? → discover → choose → run.
+        clients (many terminals)
+        ┌──────────────────┐   ┌──────────────────┐
+        │ attach           │   │ standalone       │
+        │ RemoteSession    │   │ LocalSession     │
+        └────────┬─────────┘   └────────┬─────────┘
+                 │ local socket          │ in-process
+        ┌────────▼───────────────────────▼─────────┐
+        │  CommandBroker   decides what a line means│
+        ├──────────────────────────────────────────┤
+        │  Agent (keyboard/mouse)  Subroutines     │
+        │  TaskRegistry            EventBus        │
+        └──────────────────────────────────────────┘
 ```
+
+`src/core/` (the agent) and `src/subroutines/` (behaviour) never import each
+other; both talk only through `src/contract/`. **The daemon did not change
+either of them** — that is the point of the split. The daemon layer
+(`src/daemon/`) adds framing, a versioned protocol, transport, discovery,
+locking and process lifecycle.
+
+Read [the overview](docs/OVERVIEW.md) for the diagram and the reading order.
 
 ---
 
-## Known limits
+## Security, briefly
 
-- **No authentication.** Any process that can open the socket is trusted
-  completely, and any client can `shutdown` or `stop`. The default socket is
-  user-scoped (0600 on POSIX), and loopback TCP is opt-in for this reason.
-- **`--live` in daemon mode means every attached client can drive the real
-  keyboard and mouse.** Use dry run while experimenting.
-- **Named pipes are blocked in some sandboxes.** There the daemon must be given
-  `--port 0`; the tests do exactly that, while production defaults to the pipe.
-- **Attach mode has no per-command settling.** `--exec` waits for the daemon to
-  be idle at the end; `--no-wait` skips that. Observing in-flight work is done
-  from a second client, which is the intended pattern.
-- **No client identity in the UI.** A run does not say which client started it.
-- **Printable ASCII only, one run per subroutine at a time**, as in v0_01.
+The daemon trusts any process that can open its socket: there is no
+authentication, any client can `stop` or `shutdown`, and `--live` means any
+attached client can drive the real keyboard and mouse. The default endpoint is a
+user-scoped local pipe/socket; loopback TCP is opt-in.
+
+Use dry run while experimenting. Authentication, authorisation and client
+attribution are the first items on the [roadmap](docs/ROADMAP.md).
 
 ---
 

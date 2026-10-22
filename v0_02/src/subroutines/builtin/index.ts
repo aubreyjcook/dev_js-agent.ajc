@@ -23,7 +23,13 @@ export { pressKey } from './press-key.js';
 export { scroll } from './scroll.js';
 export { typeText } from './type-text.js';
 
-/** Every built-in subroutine, in the order `help` presents them. */
+/**
+ * Every built-in subroutine, in the order `help` presents them.
+ *
+ * The order is a deliberate presentation choice, grouped by what a reader is
+ * likely to want first: a single key, then typing, then pointer actions, then
+ * the two composite behaviours.
+ */
 export const builtinSubroutines: readonly Subroutine[] = [
   pressKey,
   typeText,

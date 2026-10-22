@@ -24,6 +24,18 @@ const root = join(here, '..');
 const tsx = join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const entry = join(root, 'src', 'index.ts');
 
+// The program targets Node 20+ (see `engines` in package.json and the user
+// guide). On an older Node the failure surfaces deep inside tsx as a wall of
+// module errors, which tells the reader nothing. Fail early, with a fix.
+const nodeMajor = Number(process.versions.node.split('.')[0]);
+if (!Number.isFinite(nodeMajor) || nodeMajor < 20) {
+  console.error(
+    `These checks require Node 20 or newer; this is ${process.version}.\n` +
+      'If you use nvm, switch first (for example `nvm use 24`) and run again.',
+  );
+  process.exit(2);
+}
+
 /** Run the program with the given commands; resolve with merged output. */
 function run(commands, timeoutMs = 30_000) {
   return new Promise((resolve) => {
@@ -125,7 +137,7 @@ check('help lists the control commands', ['help'], [  ['shows exit', /exit\s+sto
 
 check('status reports driver and host', ['status'], [
   ['names the driver', /Input driver recorder \(dry run\)/],
-  ['reports node', /Node\s+24\./],
+  ['reports node', /Node\s+\d+\.\d+\.\d+/],
   ['reports state', /State\s+ready/],
 ]);
 

@@ -1158,3 +1158,18 @@ message requires editing the agent, the boundary is leaking.
 
 Then re-read §8 and try the three-terminal exercise. The behaviour makes more
 sense with three shells open.
+
+---
+
+## 16. Next version
+
+The roadmap written when v0_02 was finished is [`ROADMAP.md`](ROADMAP.md). Its
+theme is **trusted local clients**: authentication, authorisation, client
+attribution and live-mode guardrails, because the daemon currently trusts anyone
+who can open its socket.
+
+It also carries the smaller items this version deliberately deferred (clipboard
+paste for non-ASCII text, completion and history, structured output, loadable
+subroutines, log rotation, a CI matrix and PTY tests), each with acceptance
+criteria, and a recommended first milestone.
+

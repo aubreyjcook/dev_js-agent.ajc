@@ -167,6 +167,14 @@ export class RemoteSession {
     this.#onExit?.(reason);
   }
 
+  /**
+   * Process queued lines one at a time.
+   *
+   * Typing while a command is in flight queues the line rather than racing it.
+   * Output for the running command arrives through the `onOutput` callback while
+   * `#run` is awaited, which is why `#prompt` is closed before the await and
+   * reopened after — the callback writes in between.
+   */
   async #pump(): Promise<void> {
     if (this.#busy) return;
     this.#busy = true;
@@ -180,6 +188,8 @@ export class RemoteSession {
         try {
           result = await this.#run(next);
         } catch (error) {
+          // A closed socket fails every pending request; there is nothing left
+          // to command, so end the session rather than trying to reconnect.
           this.#writeError(error instanceof Error ? error.message : String(error));
           this.#requestExit('connection lost');
           return;

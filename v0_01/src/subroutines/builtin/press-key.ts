@@ -34,6 +34,9 @@ export const pressKey: Subroutine = {
   ],
 
   async entry(ctx) {
+    // The chord is written as `ctrl+shift+t`. Splitting on "+" is deliberately
+    // forgiving: trimming each part and dropping empties means `ctrl + t` and
+    // `ctrl++t` both work, rather than failing on a stray space or plus.
     const raw = ctx.param('chord');
     const chord = raw
       .split('+')
@@ -43,11 +46,18 @@ export const pressKey: Subroutine = {
       throw new Error('No keys given. Try: press-key ctrl+c');
     }
 
+    // Bounded on purpose: a mistyped repeat count should be rejected, not turn
+    // into ten thousand keypresses that the user cannot interrupt.
     const repeat = parseCount(ctx.paramOr('repeat', '1'));
     const keyDelayMs = parseDelay(ctx.paramOr('key-delay-ms', ''), TIMING.keyDelay);
 
+    // Status before the work, then after every iteration: `list` can show
+    // progress while the loop runs, not only once it finishes.
     ctx.status(`pressing ${chord.join('+')} x${repeat}`);
     for (let index = 0; index < repeat; index += 1) {
+      // Between steps is where cancellation is honoured. The agent checks it
+      // again before each driver action; doing it here means a multi-press run
+      // stops promptly instead of finishing the loop first.
       ctx.signal.throwIfCancelled();
       await ctx.agent.pressKey({ chord, keyDelayMs });
       ctx.status(`pressed ${chord.join('+')} ${index + 1}/${repeat}`);

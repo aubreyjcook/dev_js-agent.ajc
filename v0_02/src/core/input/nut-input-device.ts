@@ -101,9 +101,13 @@ export class NutInputDevice implements InputDevice {
 
   async typeText(request: TypeTextRequest, signal?: CancellationSignal): Promise<void> {
     this.#assertReady(signal);
+    // Validate the whole string before the first keystroke: a refusal halfway
+    // through a sentence is much worse than a refusal before it starts.
     this.#assertText(request.text);
     const charDelay = request.charDelayMs ?? this.#options.charDelayMs;
     for (const character of request.text) {
+      // The signal is checked per character, which is the finest granularity
+      // the agent can offer without interrupting a key mid-press.
       signal?.throwIfCancelled();
       await keyboard.type(character);
       await this.#pause(charDelay, signal);
@@ -120,7 +124,8 @@ export class NutInputDevice implements InputDevice {
       await this.#pause(keyDelay, signal);
     } finally {
       // Always release, even if the press or the pause failed: a stuck modifier
-      // is far worse than a failed keystroke.
+      // is far worse than a failed keystroke. The spread makes a copy before
+      // reversing, so the original chord order is untouched for the error path.
       try {
         await keyboard.releaseKey(...[...chord].reverse());
       } catch {
@@ -182,16 +187,22 @@ export class NutInputDevice implements InputDevice {
     }
     const button = toDriverButton(request.button ?? 'left');
     for (let index = 0; index < times; index += 1) {
+      // Between clicks, so a run of twenty is interruptible after any of them.
       signal?.throwIfCancelled();
       await mouse.click(button);
+      // No trailing pause after the final click: the caller asked for `times`
+      // clicks, not for a wait afterwards.
       if (index < times - 1) await this.#pause(this.#options.clickDelayMs, signal);
     }
   }
 
   async scroll(request: ScrollRequest, signal?: CancellationSignal): Promise<void> {
     this.#assertReady(signal);
+    // Truncate rather than round: a partial wheel step is not a thing.
     const steps = Math.trunc(request.steps);
     if (steps === 0) return;
+    // The contract uses a signed step count; the driver API wants a direction
+    // and a magnitude, so the sign is decoded here and nowhere else.
     const amount = Math.abs(steps);
     if (request.axis === 'vertical') {
       await (steps > 0 ? mouse.scrollDown(amount) : mouse.scrollUp(amount));
@@ -213,6 +224,8 @@ export class NutInputDevice implements InputDevice {
   }
 
   #assertText(text: string): void {
+    // Three separate refusals, each with a different remedy for the caller:
+    // supply something, split it up, or stop trying to send non-ASCII.
     if (text.length === 0) {
       throw new InputUnavailableError('Nothing to type: text was empty.');
     }
@@ -223,6 +236,8 @@ export class NutInputDevice implements InputDevice {
       );
     }
     if (!PRINTABLE_ASCII.test(text)) {
+      // Spread so the offending value is a whole code point; `charAt` would
+      // split an emoji's surrogate pair and report half a character.
       const offending = [...text].find((character) => !/[\x20-\x7E]/.test(character));
       throw new InputUnavailableError(
         `Cannot type ${JSON.stringify(offending)}: this driver reproduces ` +
@@ -232,6 +247,8 @@ export class NutInputDevice implements InputDevice {
   }
 
   #assertOnScreen(point: Point): void {
+    // Only possible once opened and the screen size is known; before that the
+    // point is accepted and the driver's own clipping applies.
     const size = this.#screenSize;
     if (size === undefined) return;
     if (point.x < 0 || point.y < 0 || point.x >= size.width || point.y >= size.height) {

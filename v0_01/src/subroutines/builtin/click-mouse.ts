@@ -5,6 +5,8 @@
 import { type MouseButton, type Subroutine } from '../../contract/index.js';
 import { parseCoordinate } from './move-mouse.js';
 
+// One list, used both to validate and to build the error message. Adding a
+// button means changing one place, and the error text cannot drift from it.
 const BUTTONS: readonly MouseButton[] = ['left', 'middle', 'right'];
 
 export const clickMouse: Subroutine = {
@@ -39,15 +41,21 @@ export const clickMouse: Subroutine = {
   ],
 
   async entry(ctx) {
+    // Lowercased before lookup so `Click-Mouse Left` works; `find` returns
+    // undefined rather than a wrong button, which is the branch that reports it.
     const rawButton = ctx.paramOr('button', 'left').toLowerCase();
     const button = BUTTONS.find((candidate) => candidate === rawButton);
     if (button === undefined) {
       throw new Error(`"${rawButton}" is not a button. Use ${BUTTONS.join(', ')}.`);
     }
 
+    // Capped for the same reason as press-key's repeat: a typo should be an
+    // error, not an unstoppable burst of clicks.
     const times = parseCount(ctx.paramOr('times', '1'));
     const at = parseOptionalPoint(ctx.paramOr('x', ''), ctx.paramOr('y', ''));
 
+    // `at` is only spread when defined, so "click where the cursor is" sends no
+    // position at all rather than a meaningless 0,0.
     ctx.status(at === undefined ? `clicking ${button} x${times}` : `clicking at ${at.x},${at.y}`);
     await ctx.agent.clickMouse({
       button,

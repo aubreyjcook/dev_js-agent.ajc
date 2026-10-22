@@ -86,6 +86,9 @@ export class RecordingInputDevice implements InputDevice {
 
   async typeText(request: TypeTextRequest, signal?: CancellationSignal): Promise<void> {
     this.#prepare(signal);
+    // One action per character, matching how the live driver works. A test can
+    // then assert exactly what would have been typed, and cancellation has the
+    // same granularity in both drivers.
     for (const character of request.text) {
       signal?.throwIfCancelled();
       this.#actions.push({ type: 'typeText', text: character });
@@ -98,6 +101,8 @@ export class RecordingInputDevice implements InputDevice {
     // Validate the key names exactly as the live driver would, so dry runs catch
     // a typo like `crtl` instead of hiding it.
     resolveChord(request.chord);
+    // Copy the chord: the caller keeps its array, and the transcript must not
+    // change if that array is later mutated.
     this.#actions.push({ type: 'pressKey', chord: [...request.chord] });
     await cancellableSleep(request.keyDelayMs ?? TIMING.keyDelay, this.#signal(signal), this.#clock);
   }
@@ -109,10 +114,14 @@ export class RecordingInputDevice implements InputDevice {
 
   async moveMouse(request: MoveMouseRequest, signal?: CancellationSignal): Promise<void> {
     this.#prepare(signal);
+    // Rounding matches the live driver's behaviour, so a dry run accepts and
+    // records the same request the real run would perform.
     const target = { x: Math.round(request.x), y: Math.round(request.y) };
     this.#assertOnScreen(target);
     this.#cursor = target;
     this.#actions.push({ type: 'moveMouse', to: target });
+    // Simulated travel time is configurable and defaults to 0, so tests are
+    // fast; the request's own duration still wins when one is supplied.
     const duration = request.durationMs ?? this.#moveDurationMs;
     if (duration > 0) {
       await cancellableSleep(duration, this.#signal(signal), this.#clock);
@@ -124,6 +133,8 @@ export class RecordingInputDevice implements InputDevice {
     signal?: CancellationSignal,
   ): Promise<void> {
     this.#prepare(signal);
+    // Clamp rather than trust: the agent already normalises this, but a driver
+    // should not be able to record "click 0 times" if a caller slips through.
     const times = Math.max(1, Math.trunc(request.times ?? 1));
     if (request.at !== undefined) {
       await this.moveMouse({ ...request.at, durationMs: 0 }, signal);
@@ -132,6 +143,7 @@ export class RecordingInputDevice implements InputDevice {
       type: 'clickMouse',
       button: request.button ?? 'left',
       times,
+      // Copy the point, same reason as the chord above.
       ...(request.at !== undefined ? { at: { ...request.at } } : {}),
     });
   }

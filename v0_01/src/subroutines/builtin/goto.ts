@@ -32,6 +32,8 @@ export const goto: Subroutine = {
     // `goto --new example.com` and `goto example.com --new` both work.
     const raw = ctx.param('url');
     const flags = parseArguments(raw).filter((part) => part.startsWith('-'));
+    // Remove the flags, then join what is left: spaces are not valid inside the
+    // address anyway, and this tolerates the user spreading it over words.
     const address = raw
       .split(/\s+/)
       .filter((part) => part.length > 0 && !part.startsWith('-'))
@@ -39,6 +41,9 @@ export const goto: Subroutine = {
     const url = normaliseUrl(address);
     const wantsNewWindow = flags.some((flag) => /^--?(new|new-window)$/i.test(flag));
 
+    // Defence in depth. `normaliseUrl` only admits http(s) and URL-encodes the
+    // rest, and this allowlist guarantees no quoting or shell metacharacter can
+    // reach the Run dialog even if that logic changes later.
     if (!SAFE_URL.test(url)) {
       throw new Error(
         `Refusing to type "${url}": it contains characters that are not valid ` +
@@ -51,14 +56,18 @@ export const goto: Subroutine = {
     ctx.status(`opening ${url}`);
     ctx.log.info(`Run dialog -> ${command}`);
 
-    // Clear any pending dialog state first, so we cannot type into the wrong box.
+    // Clear any pending dialog state first. If a previous dialog is still open,
+    // Win+R could be swallowed or the text could land in the wrong box; Escape
+    // makes the sequence start from a known state.
     ctx.signal.throwIfCancelled();
     await ctx.agent.pressKey({ chord: ['escape'] });
     await ctx.sleep(120);
 
     ctx.signal.throwIfCancelled();
     await ctx.agent.pressKey({ chord: ['super', 'r'] });
-    // The Run dialog needs a moment before it will accept input.
+    // The Run dialog needs a moment before it will accept input. This is a
+    // timing assumption, not a guarantee; a future version should wait for the
+    // window instead (see the roadmap).
     await ctx.sleep(650);
 
     ctx.signal.throwIfCancelled();

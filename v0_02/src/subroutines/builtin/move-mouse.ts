@@ -22,16 +22,22 @@ export const moveMouse: Subroutine = {
   ],
 
   async entry(ctx) {
+    // Parse before moving anything: a bad coordinate should be an error, not a
+    // half-finished gesture. `parseCoordinate` also rejects negatives, because
+    // screen coordinates start at the top-left corner.
     const x = parseCoordinate(ctx.param('x'), 'x');
     const y = parseCoordinate(ctx.param('y'), 'y');
     const durationMs = parseDuration(ctx.paramOr('duration-ms', ''));
 
+    // Status first so `list` shows intent while the cursor is still travelling.
     ctx.status(`moving to ${x},${y}`);
     await ctx.agent.moveMouse({ x, y, durationMs });
     ctx.status(`cursor at ${x},${y}`);
   },
 };
 
+/** Parse one axis. Whole pixels only: the driver rounds, and rounding silently
+ *  turns a typo into a small movement rather than an error. */
 export function parseCoordinate(raw: string, axis: string): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || !Number.isInteger(value)) {
@@ -43,6 +49,8 @@ export function parseCoordinate(raw: string, axis: string): number {
   return value;
 }
 
+/** An omitted duration means "use the default pace". `0` is meaningful (teleport),
+ *  which is why the empty string is checked first rather than falsiness. */
 function parseDuration(raw: string): number {
   if (raw.trim() === '') return TIMING.moveDuration;
   const value = Number(raw);

@@ -45,6 +45,13 @@ export interface Command {
   readonly run: (context: CommandContext, args: readonly string[]) => Promise<void> | void;
 }
 
+/**
+ * Built-ins are *data*, not a chain of `if` statements.
+ *
+ * That choice is what lets `help` be generated from the same definitions the
+ * dispatcher uses: a new command cannot be added without its summary travelling
+ * with it, and `help` cannot drift from what actually runs.
+ */
 const HELP: Command = {
   name: 'help',
   aliases: ['?', 'h'],
@@ -77,6 +84,13 @@ const HELP: Command = {
   },
 };
 
+/**
+ * The window onto the task registry.
+ *
+ * Active work and finished history are two different questions, so `--all` is a
+ * flag rather than the default: most of the time a person asking "what is running"
+ * does not want a transcript of everything that ever ran.
+ */
 const LIST: Command = {
   name: 'list',
   aliases: ['jobs', 'ps'],
@@ -104,6 +118,14 @@ const LIST: Command = {
   },
 };
 
+/**
+ * Cancel everything, then report what actually happened.
+ *
+ * `stopAll` waits for each run to unwind before returning, which is why the
+ * summary can distinguish "cancelled" from "had already finished" instead of
+ * guessing. Any words after `stop` are kept as the cancellation reason, so the
+ * task history explains *why* it was stopped.
+ */
 const STOP: Command = {
   name: 'stop',
   aliases: ['kill', 'cancel', 'stopall'],
@@ -128,6 +150,12 @@ const STOP: Command = {
   },
 };
 
+/**
+ * Read-only introspection: no side effects, safe to run at any time.
+ *
+ * It goes through the narrow `AgentStatusSource` rather than the agent, so a
+ * command cannot accidentally send input even if someone edits this file later.
+ */
 const STATUS: Command = {
   name: 'status',
   summary: 'show the agent, its input driver and the host it runs on',
@@ -151,6 +179,13 @@ const STATUS: Command = {
   },
 };
 
+/**
+ * Leave the program.
+ *
+ * In this version there is only one scope, so `exit` stops running work and
+ * closes. It reports how much it is stopping first, rather than silently
+ * cancelling something the user may have forgotten about.
+ */
 const EXIT: Command = {
   name: 'exit',
   aliases: ['quit', 'q'],

@@ -12,7 +12,16 @@ import { Key } from '@nut-tree-fork/nut-js';
 /** Driver-neutral key token: a lowercase name, or a single character. */
 export type KeyToken = string;
 
-/** Aliases accepted on input, normalised to a canonical token. */
+/**
+ * Aliases accepted on input, normalised to a canonical token.
+ *
+ * The canonical side is the vocabulary the rest of the program speaks; this
+ * table exists so people can write what their keyboard or operating system
+ * actually calls a key. `win`, `cmd`, `meta` and `super` are the same physical
+ * key under different platform names, and `return`/`enter`, `esc`/`escape` are
+ * the same key under two names. Normalising once here means no other module has
+ * to care which word the user chose.
+ */
 const ALIASES: Record<string, KeyToken> = {
   control: 'ctrl',
   ctrl: 'ctrl',
@@ -66,7 +75,15 @@ const ALIASES: Record<string, KeyToken> = {
   backtick: 'grave',
 };
 
-/** Canonical name -> nut-js key, for everything that is not a single character. */
+/**
+ * Canonical name -> nut-js key, for everything that is not a single character.
+ *
+ * Modifiers deliberately map to their **left** variants: pressing `ctrl` should
+ * behave like the left Ctrl key, which is what a person means, and chords are
+ * pressed modifier-first by the driver. Single letters, digits and shifted
+ * punctuation are handled separately in `toDriverKey`, because they need either
+ * enum-name lookup or a shift.
+ */
 const NAMED_KEYS: Record<string, Key> = {
   ctrl: Key.LeftControl,
   shift: Key.LeftShift,
@@ -215,7 +232,15 @@ export class ShiftedKeyError extends Error {
   }
 }
 
-/** Normalise one raw key name into a canonical token. */
+/**
+ * Normalise one raw key name into a canonical token.
+ *
+ * Order matters. Aliases win first so `return` becomes `enter`; then the
+ * function row, which is a numeric pattern rather than a table; then numpad
+ * names; then the named table; and only then a literal single character. That
+ * last fallback is what lets `press-key A` and `press-key #` mean what they look
+ * like, while still rejecting a misspelling like `crtl`.
+ */
 export function normaliseKeyName(raw: string): KeyToken {
   const trimmed = raw.trim();
   if (trimmed.length === 0) {
@@ -293,7 +318,12 @@ function shiftHint(token: string): string {
   return pairs[token] ?? `shift+<key>`;
 }
 
-/** True when the token is a modifier that must be held while typing a chord. */
+/**
+ * True when the token is a modifier that must be held while typing a chord.
+ *
+ * Exactly these four, because they are the keys the driver presses first and
+ * releases last. Anything else in a chord is a key to press while they are held.
+ */
 export function isModifier(token: KeyToken): boolean {
   return token === 'ctrl' || token === 'shift' || token === 'alt' || token === 'super';
 }

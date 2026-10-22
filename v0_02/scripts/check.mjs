@@ -35,6 +35,18 @@ const tsx = join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const entry = join(root, 'src', 'index.ts');
 const nodePath = process.execPath;
 
+// The program targets Node 20+ (see `engines` in package.json and the user
+// guide). Running the checks on an older Node fails deep inside tsx with a wall
+// of module errors, which tells the reader nothing. Fail early instead.
+const nodeMajor = Number(process.versions.node.split('.')[0]);
+if (!Number.isFinite(nodeMajor) || nodeMajor < 20) {
+  console.error(
+    `These checks require Node 20 or newer; this is ${process.version}.\n` +
+      'If you use nvm, switch first (for example `nvm use 24`) and run again.',
+  );
+  process.exit(2);
+}
+
 const results = [];
 const filter = process.argv[2];
 

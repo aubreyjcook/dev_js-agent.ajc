@@ -84,6 +84,9 @@ async function main(argv: readonly string[]): Promise<number> {
     throw error;
   }
 
+  // One branch per mode, and no `default`: `RunMode` is a closed union, so the
+  // compiler proves every case is handled. `--detach` is not a fourth mode; it
+  // is a property of daemon mode, which is why it is tested inside the branch.
   switch (mode) {
     case 'standalone':
       return runStandalone(config, version);
@@ -115,6 +118,9 @@ async function runStandalone(
     ...(config.noWait ? { noWait: true } : {}),
   });
 
+  // SIGINT is routed through the session rather than left to kill the process:
+  // the session knows whether it is mid-command, owns the prompt, and can stop
+  // work and release the device in order.
   const onInterrupt = (): void => session.interrupt();
   process.on('SIGINT', onInterrupt);
 
@@ -315,6 +321,8 @@ async function runAttach(
     version,
     ...(config.noWait ? { noWait: true } : {}),
   });
+  // In a client, Ctrl+C must *detach*, not stop shared work. `RemoteSession`
+  // closes only its own connection; `stop` remains the explicit way to cancel.
   const onInterrupt = (): void => session.interrupt();
   process.on('SIGINT', onInterrupt);
 

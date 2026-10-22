@@ -101,16 +101,20 @@ export function parseCliArgs(argv: readonly string[]): CliConfig {
       );
     }
 
+    // Accept both `--log-level debug` and `--log-level=debug`. Splitting on the
+    // first `=` keeps values that themselves contain `=` intact.
     const withoutDashes = argument.replace(/^--?/, '');
     const equals = withoutDashes.indexOf('=');
     const name = equals === -1 ? withoutDashes : withoutDashes.slice(0, equals);
     const inlineValue = equals === -1 ? undefined : withoutDashes.slice(equals + 1);
 
-    // Single-character names are accepted as short forms of the long ones.
+    // Look the flag up in the same table that generates `--help`, so the
+    // documented surface and the accepted surface cannot drift apart.
     const spec = OPTIONS.find((option) => option.name === name);
     if (spec === undefined) {
       throw new CliError(`Unknown option "${argument}". Try --help.`);
     }
+    // `--exec` is the one repeatable flag: a script is a list of commands.
     if (seen.has(spec.name) && spec.name !== 'exec') {
       throw new CliError(`Option --${spec.name} was given more than once.`);
     }
@@ -118,6 +122,9 @@ export function parseCliArgs(argv: readonly string[]): CliConfig {
 
     let value = inlineValue;
     if (spec.kind !== 'none' && value === undefined) {
+      // The value is the next argument, consumed by advancing the index. It may
+      // not itself look like a long flag, which catches `--speed --live` instead
+      // of silently using "--live" as a number.
       const next = argv[index + 1];
       if (next === undefined || next.startsWith('--')) {
         throw new CliError(`Option --${spec.name} needs a value.`);
@@ -129,12 +136,20 @@ export function parseCliArgs(argv: readonly string[]): CliConfig {
     apply(config, spec, value);
   }
 
-  // --dry-run wins over --live, whichever order they appear in.
+  // Both flags control the same setting, so the safer one wins regardless of
+  // order. A command line that asks for both is contradictory; choosing dry run
+  // means the ambiguity can never cause real input.
   if (seen.has('dry-run')) config.live = false;
 
   return config;
 }
 
+/** Apply one already-validated flag to the config.
+ *
+ *  Kept separate from the parse loop so the loop only has to worry about
+ *  argument *shape* (which value belongs to which flag); this function worries
+ *  about each flag's *meaning*. `default` is silence for the two flags handled
+ *  outside the loop (`help`, `--mode`-style flags in later versions). */
 function apply(config: CliConfig, spec: OptionSpec, value: string | undefined): void {
   switch (spec.name) {
     case 'live':

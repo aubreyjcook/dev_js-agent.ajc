@@ -58,18 +58,25 @@ export const typeText: Subroutine = {
 
     ctx.log.debug(`typing ${text.length} character(s)`);
     ctx.status(`typing ${text.length} chars`);
+    // Send the text in chunks rather than one giant driver call. Two reasons:
+    // a chunk boundary is a place where cancellation and progress can happen,
+    // and the driver's per-character delay then applies across the whole string
+    // without one unbounded await.
     const chunkSize = 40;
     for (let offset = 0; offset < text.length; offset += chunkSize) {
       ctx.signal.throwIfCancelled();
       const chunk = text.slice(offset, offset + chunkSize);
       await ctx.agent.typeText({ text: chunk, charDelayMs });
+      // `Math.min` because the final chunk is usually short.
       ctx.status(`typed ${Math.min(offset + chunkSize, text.length)}/${text.length} chars`);
     }
     ctx.status(`typed ${text.length} chars`);
   },
 };
 
-/** Accept a numeric delay, falling back rather than failing on junk. */
+/** Accept a numeric delay, falling back rather than failing on junk.
+ *  An empty string means "not supplied"; `0` is a real value (type as fast as
+ *  the driver can), so the emptiness check comes first. */
 export function parseDelay(raw: string, fallback: number): number {
   if (raw.trim() === '') return fallback;
   const value = Number(raw);

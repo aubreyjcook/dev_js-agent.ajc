@@ -161,16 +161,24 @@ export class DaemonClient {
   /** Run one command and wait for its outcome. */
   async run(line: string, handlers: CommandHandlers = {}): Promise<CommandResult> {
     await this.#ready;
+    // Ids rise monotonically rather than reusing small numbers. A late reply for
+    // an abandoned request must not be mistaken for the answer to a new one.
     const id = this.#nextId;
     this.#nextId += 1;
 
     return new Promise<CommandResult>((resolve, reject) => {
+      // Every request has its own timeout, so a daemon that stops answering
+      // fails the caller instead of leaving a CLI hanging forever.
       const timer = setTimeout(() => {
         this.#pending.delete(id);
         reject(new Error(`No reply from the daemon within ${this.#commandTimeoutMs} ms.`));
       }, this.#commandTimeoutMs);
+      // `unref` so a pending request does not keep the process alive by itself;
+      // the socket does that while it is genuinely connected.
       timer.unref?.();
 
+      // The entry is registered *before* sending. A fast reply cannot arrive
+      // before there is somewhere to put it.
       this.#pending.set(id, {
         resolve,
         reject,

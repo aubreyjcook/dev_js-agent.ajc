@@ -75,7 +75,7 @@ codebase you ever work on.
 cd v0_01
 npm install
 npm run check      # tsc --noEmit — type-check only, no files written
-npm test           # 28 behaviour checks
+npm test           # 28 behaviour checks (v0_01's suite; v0_02 has 45)
 npm start          # interactive, dry run (nothing reaches your real desktop)
 npm run live       # interactive, real keyboard and mouse
 ```
@@ -416,7 +416,7 @@ property (the *discriminant*, here `ok`) that lets TypeScript narrow which shape
 you have. It is how you model "one of several outcomes" without exceptions and
 without `null`-checking guesswork.
 
-Used at the call site in [`session.ts`](../src/terminal/session.ts):
+Used at the call site in [`session.ts`](../../v0_01/src/terminal/session.ts):
 
 ```ts
 const prepared = this.#runtime.subroutines.prepareRun(parsed.name, parsed.args);
@@ -1725,7 +1725,14 @@ change to add a behaviour? Here, two.
 
 ## 11. The terminal: the only module that knows both halves
 
-**Files:** [`src/terminal/session.ts`](../src/terminal/session.ts),
+> **v0_02 note.** This chapter describes v0_01's `TerminalSession`. In v0_02 it
+> was split: dispatch moved to `terminal/broker.ts`, and the prompt became
+> `terminal/local-session.ts` (local) and `terminal/remote-session.ts` (attached).
+> The links below point at the v0_01 source because that is the code this chapter
+> describes. For the v0_02 behaviour, see [`V0_02-CHANGES.md`](V0_02-CHANGES.md)
+> §2 and §11.
+
+**Files:** [`src/terminal/session.ts`](../../v0_01/src/terminal/session.ts),
 [`commands.ts`](../src/terminal/commands.ts),
 [`banner.ts`](../src/terminal/banner.ts),
 [`parse-command-line.ts`](../src/terminal/parse-command-line.ts)
@@ -2250,7 +2257,7 @@ alone, those declarations must be expanded by hand.
 | contextually typed param | `async entry(ctx) { … }` | every subroutine |
 | arrow vs declaration hoisting | `function onCancel()` used above its definition | [`contract/signals.ts`](../src/contract/signals.ts) |
 | narrowing via `instanceof` | `if (error instanceof CliError)` | [`index.ts`](../src/index.ts) |
-| narrowing via discriminant | `if (!prepared.ok) return …` | [`terminal/session.ts`](../src/terminal/session.ts) |
+| narrowing via discriminant | `if (!prepared.ok) return …` | [`terminal/session.ts`](../../v0_01/src/terminal/session.ts) |
 | optional chaining | `signal?.throwIfCancelled()` | [`core/input/nut-input-device.ts`](../src/core/input/nut-input-device.ts) |
 | nullish coalescing | `options.charDelayMs ?? TIMING.charDelay` | [`core/input/nut-input-device.ts`](../src/core/input/nut-input-device.ts) |
 | nullish assignment | `this.#starting ??= this.#openDevice()` | [`core/agent.ts`](../src/core/agent.ts) |
@@ -2688,7 +2695,7 @@ Read in this order, and change something as you go:
 6. [`src/core/agent.ts`](../src/core/agent.ts) — the input pipeline.
 7. [`src/subroutines/registry.ts`](../src/subroutines/registry.ts) — running
    behaviour as tracked work, and the sync/async split.
-8. [`src/terminal/session.ts`](../src/terminal/session.ts) — dispatch, the
+8. [`src/terminal/session.ts`](../../v0_01/src/terminal/session.ts) — dispatch, the
    prompt, and shutdown.
 9. [`src/app.ts`](../src/app.ts) and [`src/index.ts`](../src/index.ts) —
    wiring and entry.

@@ -191,6 +191,14 @@ const EXIT: Command = {
   },
 };
 
+/**
+ * Stop the whole service.
+ *
+ * Deliberately *not* an alias of `exit`. In a daemon, `exit` means "this terminal
+ * is done" and must not cancel another client's work; `shutdown` is the explicit
+ * request to end the process that owns the device. Keeping them separate is what
+ * makes closing one terminal safe.
+ */
 const SHUTDOWN: Command = {
   name: 'shutdown',
   summary: 'stop the program, or the daemon and every attached client',
